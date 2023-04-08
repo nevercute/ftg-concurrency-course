@@ -6,25 +6,21 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 
 public class ReportServiceCF {
 
-    private ExecutorService executor = ForkJoinPool.commonPool();
+    private ExecutorService executor = Executors.newFixedThreadPool(2);
 
     private LoadGenerator loadGenerator = new LoadGenerator();
 
     public Others.Report getReport() {
-        CompletableFuture<Collection<Others.Item>> itemsCF =
-                CompletableFuture.supplyAsync(() -> getItems(), executor);
-
-        CompletableFuture<Collection<Others.Customer>> customersCF =
-                CompletableFuture.supplyAsync(() -> getActiveCustomers(), executor);
-
-        CompletableFuture<Others.Report> reportTask =
-                customersCF.thenCombine(itemsCF,
-                        (customers, orders) -> combineResults(orders, customers));
-
+        CompletableFuture<Others.Report> reportTask = CompletableFuture.supplyAsync(() -> getItems(), executor)
+                .thenCombine(
+                        CompletableFuture.supplyAsync(() -> getActiveCustomers(), executor),
+                        (items, customers) -> combineResults(items, customers)
+                );
         return reportTask.join();
     }
 
