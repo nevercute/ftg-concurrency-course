@@ -28,11 +28,20 @@ public class PriceAggregator {
     }
 
     public double getMinPrice(long itemId) {
-        var executor = Executors.newFixedThreadPool(20);
+        var executor = Executors.newCachedThreadPool();
         var futureTasks = shopIds.stream()
                 .map(it -> CompletableFuture.supplyAsync(
-                                () -> priceRetriever.getPrice(itemId, it), executor
-                        ).completeOnTimeout(Double.NaN, 3000, TimeUnit.MILLISECONDS)
+                                        () -> priceRetriever.getPrice(itemId, it), executor
+                                ).completeOnTimeout(Double.NaN, 2800, TimeUnit.MILLISECONDS)
+                                .handle((i, e) -> {
+                                    if (e != null) {
+                                        System.out.println("Задача в потоке " + Thread.currentThread().getName()
+                                                + " завершилась с ошибкой");
+                                        return Double.NaN;
+                                    } else {
+                                        return i;
+                                    }
+                                })
                 )
                 .collect(Collectors.toList());
         CompletableFuture.allOf(futureTasks.toArray(new CompletableFuture[]{})).join();
