@@ -31,8 +31,8 @@ public class PriceAggregator {
         var executor = Executors.newFixedThreadPool(20);
         var futureTasks = shopIds.stream()
                 .map(it -> CompletableFuture.supplyAsync(
-                                () -> getPrice(itemId, it), executor
-                        ).completeOnTimeout(Double.NaN, 2500, TimeUnit.MILLISECONDS)
+                                () -> priceRetriever.getPrice(itemId, it), executor
+                        ).completeOnTimeout(Double.NaN, 3000, TimeUnit.MILLISECONDS)
                 )
                 .collect(Collectors.toList());
         CompletableFuture.allOf(futureTasks.toArray(new CompletableFuture[]{})).join();
@@ -49,16 +49,5 @@ public class PriceAggregator {
                 })
                 .min(Double::compareTo)
                 .orElseGet(() -> Double.NaN);
-    }
-
-    private Double getPrice(long itemId, long shopId) {
-        int delay = ThreadLocalRandom.current().nextInt(10);
-        sleep(delay);
-        return priceRetriever.getPrice(itemId, shopId);
-    }
-
-    private void sleep(int delay) {
-        try { Thread.sleep(delay * 1000);
-        } catch (InterruptedException e) {}
     }
 }
