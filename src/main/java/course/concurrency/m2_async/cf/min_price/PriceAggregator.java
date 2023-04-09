@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +15,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 public class PriceAggregator {
+
+    private final Executor executor = Executors.newCachedThreadPool();
 
     private PriceRetriever priceRetriever = new PriceRetriever();
 
@@ -28,18 +31,18 @@ public class PriceAggregator {
     }
 
     public double getMinPrice(long itemId) {
-        var executor = Executors.newCachedThreadPool();
         var futureTasks = shopIds.stream()
                 .map(it -> CompletableFuture.supplyAsync(
                                         () -> priceRetriever.getPrice(itemId, it), executor
-                                ).completeOnTimeout(Double.NaN, 2800, TimeUnit.MILLISECONDS)
-                                .handle((i, e) -> {
-                                    if (e != null) {
+                                )
+                                .completeOnTimeout(Double.NaN, 2800, TimeUnit.MILLISECONDS)
+                                .handle((price, exception) -> {
+                                    if (exception != null) {
                                         System.out.println("Задача в потоке " + Thread.currentThread().getName()
-                                                + " завершилась с ошибкой");
+                                                + " завершилась с ошибкой: " + exception.getMessage());
                                         return Double.NaN;
                                     } else {
-                                        return i;
+                                        return price;
                                     }
                                 })
                 )
@@ -47,15 +50,7 @@ public class PriceAggregator {
         CompletableFuture.allOf(futureTasks.toArray(new CompletableFuture[]{})).join();
         return futureTasks.stream()
                 .filter(cf -> cf.isDone() && !cf.isCancelled())
-                .map(it -> {
-                    try {
-                        return it.get();
-                    } catch (InterruptedException | ExecutionException e) {
-                        System.out.println("Задача завершилась с ошибкой: " + e.getMessage() +
-                                ", поток: " + Thread.currentThread().getName());
-                        return Double.NaN;
-                    }
-                })
+                .map(CompletableFuture::join)
                 .min(Double::compareTo)
                 .orElseGet(() -> Double.NaN);
     }
