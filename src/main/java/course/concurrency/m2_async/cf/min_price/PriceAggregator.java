@@ -49,9 +49,8 @@ public class PriceAggregator {
                 .collect(Collectors.toList());
         CompletableFuture.allOf(futureTasks.toArray(new CompletableFuture[]{})).join();
         return futureTasks.stream()
-                .filter(cf -> cf.isDone() && !cf.isCancelled())
                 .map(CompletableFuture::join)
                 .min(Double::compareTo)
-                .orElseGet(() -> Double.NaN);
+                .orElse(Double.NaN);
     }
 }
